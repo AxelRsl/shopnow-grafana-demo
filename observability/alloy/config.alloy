@@ -249,7 +249,6 @@ loki.process "parse_logs" {
   stage.match {
     selector = "{service_name=\"mongodb\"}"
     
-    // Parsear el JSON de MongoDB
     stage.json {
       expressions = {
         mongo_severity  = "s",
@@ -259,13 +258,11 @@ loki.process "parse_logs" {
       }
     }
     
-    // Mapear severidad de MongoDB a niveles estándar
     stage.template {
       source   = "detected_level"
       template = "{{ if eq .mongo_severity \"I\" }}info{{ else if eq .mongo_severity \"W\" }}warn{{ else if eq .mongo_severity \"E\" }}error{{ else if eq .mongo_severity \"F\" }}critical{{ else if eq .mongo_severity \"D\" }}debug{{ else }}info{{ end }}"
     }
     
-    // Agregar como structured metadata
     stage.structured_metadata {
       values = {
         detected_level  = "detected_level",
@@ -281,12 +278,10 @@ loki.process "parse_logs" {
   stage.match {
     selector = "{service_name=\"postgres\"}"
     
-    // Buscar palabras clave de nivel en logs de PostgreSQL
     stage.regex {
       expression = "(?P<pg_level>LOG|ERROR|WARNING|FATAL|PANIC|INFO|DEBUG)"
     }
     
-    // Mapear a niveles estándar
     stage.template {
       source   = "detected_level"
       template = "{{ if eq .pg_level \"LOG\" }}info{{ else if eq .pg_level \"INFO\" }}info{{ else if eq .pg_level \"DEBUG\" }}debug{{ else if eq .pg_level \"WARNING\" }}warn{{ else if eq .pg_level \"ERROR\" }}error{{ else if eq .pg_level \"FATAL\" }}critical{{ else if eq .pg_level \"PANIC\" }}critical{{ else }}info{{ end }}"
@@ -306,26 +301,54 @@ loki.process "parse_logs" {
   stage.match {
     selector = "{service_name=\"redis\"}"
     
-    // Redis usa símbolos: . = debug, * = verbose, # = warning, - = notice
+    // Extraer símbolo Redis
     stage.regex {
       expression = "\\[\\d+\\]\\s+\\d+\\s+\\w+\\s+[\\d:]+\\.\\d+\\s+(?P<redis_symbol>[*#.-])"
     }
     
-    // Detectar ataques de seguridad CON GRUPO NOMBRADO
+    // Detectar si hay SECURITY en el mensaje
     stage.regex {
-      expression = "(?i)(?P<is_security_attack>SECURITY)"
+      expression = "(?i)(?P<has_security>SECURITY)"
     }
     
-    // Determinar nivel: primero chequear si hay ataque
+    // Determinar nivel en UN SOLO template
     stage.template {
       source   = "detected_level"
-      template = "{{ if .is_security_attack }}error{{ else if eq .redis_symbol \".\" }}debug{{ else if eq .redis_symbol \"*\" }}info{{ else if eq .redis_symbol \"#\" }}warn{{ else if eq .redis_symbol \"-\" }}notice{{ else }}info{{ end }}"
+      template = "{{ if .has_security }}error{{ else if eq .redis_symbol \".\" }}debug{{ else if eq .redis_symbol \"*\" }}info{{ else if eq .redis_symbol \"#\" }}warn{{ else if eq .redis_symbol \"-\" }}notice{{ else }}info{{ end }}"
     }
     
     stage.structured_metadata {
       values = {
         detected_level = "detected_level",
         redis_symbol   = "redis_symbol",
+      }
+    }
+  }
+  
+  // ========================================
+  // NODE.JS SERVICES & ALLOY: Parse LOGFMT
+  // ========================================
+  stage.match {
+    selector = "{service_name=~\"api-gateway|order-service|payment-service|inventory-service|recommendation-service|alloy\"}"
+    
+    // Parsear LOGFMT (level=info msg="..." etc.)
+    stage.logfmt {
+      mapping = {
+        extracted_level = "level",
+        msg             = "msg",
+        component_id    = "component_id",
+      }
+    }
+    
+    // Mapear el nivel extraído
+    stage.template {
+      source   = "detected_level"
+      template = "{{ if .extracted_level }}{{ .extracted_level | ToLower }}{{ else }}info{{ end }}"
+    }
+    
+    stage.structured_metadata {
+      values = {
+        detected_level = "detected_level",
       }
     }
   }
