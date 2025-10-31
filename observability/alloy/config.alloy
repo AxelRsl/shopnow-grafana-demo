@@ -104,7 +104,7 @@ prometheus.remote_write "grafana_cloud" {
 // Sends logs to Grafana Cloud Loki
 // ====================================
 otelcol.exporter.loki "grafana_cloud" {
-  forward_to = [loki.write.grafana_cloud.receiver]
+  forward_to = [loki.process.parse_logs.receiver]
 }
 
 loki.write "grafana_cloud" {
