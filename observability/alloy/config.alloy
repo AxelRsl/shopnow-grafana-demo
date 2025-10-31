@@ -306,20 +306,32 @@ loki.process "parse_logs" {
   stage.match {
     selector = "{service_name=\"redis\"}"
     
-    // Redis usa formato: [PID] DD MMM HH:MM:SS.mmm [LEVEL] message
+    // Redis usa símbolos: . = debug, * = verbose, # = warning, - = notice
     stage.regex {
-      expression = "\\[\\d+\\]\\s+\\d+\\s+\\w+\\s+[\\d:]+\\.\\d+\\s+[*#.-]\\s+(?P<redis_level>\\w+):"
+      expression = "\\[\\d+\\]\\s+\\d+\\s+\\w+\\s+[\\d:]+\\.\\d+\\s+(?P<redis_symbol>[*#.-])"
     }
     
-    // Normalizar niveles de Redis (puede usar ., *, #, -)
+    // Mapear símbolos de Redis a niveles estándar
     stage.template {
       source   = "detected_level"
-      template = "{{ if .redis_level }}{{ .redis_level | ToLower }}{{ else }}info{{ end }}"
+      template = "{{ if eq .redis_symbol \".\" }}debug{{ else if eq .redis_symbol \"*\" }}info{{ else if eq .redis_symbol \"#\" }}warn{{ else if eq .redis_symbol \"-\" }}notice{{ else }}info{{ end }}"
+    }
+    
+    // Detectar ataques de seguridad en el mensaje
+    stage.regex {
+      expression = "(?i)(?P<security_attack>SECURITY ATTACK|ATTACK detected)"
+    }
+    
+    // Si se detectó ataque de seguridad, elevar a error
+    stage.template {
+      source   = "detected_level"
+      template = "{{ if .security_attack }}error{{ else }}{{ .detected_level }}{{ end }}"
     }
     
     stage.structured_metadata {
       values = {
         detected_level = "detected_level",
+        redis_symbol   = "redis_symbol",
       }
     }
   }
