@@ -1,0 +1,201 @@
+// Grafana Alloy Configuration for ShopNow Demo
+// This configuration collects metrics, logs, and traces and sends them to Grafana Cloud
+
+// ====================================
+// LOGGING CONFIGURATION
+// ====================================
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+// ====================================
+// OTLP RECEIVER
+// Receives telemetry from OpenTelemetry instrumented services
+// ====================================
+otelcol.receiver.otlp "default" {
+  // gRPC endpoint
+  grpc {
+    endpoint = "0.0.0.0:4317"
+  }
+  
+  // HTTP endpoint
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+
+  output {
+    metrics = [otelcol.processor.batch.default.input]
+    logs    = [otelcol.processor.batch.default.input]
+    traces  = [otelcol.processor.batch.default.input]
+  }
+}
+
+// ====================================
+// BATCH PROCESSOR
+// Batches telemetry data for efficient transmission
+// ====================================
+otelcol.processor.batch "default" {
+  timeout          = "5s"
+  send_batch_size  = 1024
+  
+  output {
+    metrics = [otelcol.processor.attributes.add_labels.input]
+    logs    = [otelcol.processor.attributes.add_labels.input]
+    traces  = [otelcol.processor.attributes.add_labels.input]
+  }
+}
+
+// ====================================
+// ATTRIBUTES PROCESSOR
+// Adds common labels to all telemetry
+// ====================================
+otelcol.processor.attributes "add_labels" {
+  action {
+    key    = "environment"
+    value  = "demo"
+    action = "upsert"
+  }
+  
+  action {
+    key    = "application"
+    value  = "shopnow"
+    action = "upsert"
+  }
+  
+  output {
+    metrics = [otelcol.exporter.prometheus.grafana_cloud.input]
+    logs    = [otelcol.exporter.loki.grafana_cloud.input]
+    traces  = [otelcol.exporter.otlp.grafana_cloud.input]
+  }
+}
+
+// ====================================
+// PROMETHEUS EXPORTER
+// Converts OTLP metrics to Prometheus format
+// ====================================
+otelcol.exporter.prometheus "grafana_cloud" {
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+// ====================================
+// PROMETHEUS REMOTE WRITE
+// Sends metrics to Grafana Cloud Mimir
+// ====================================
+prometheus.remote_write "grafana_cloud" {
+  endpoint {
+    url = env("GRAFANA_CLOUD_PROMETHEUS_URL")
+    
+    basic_auth {
+      username = env("GRAFANA_CLOUD_PROMETHEUS_USER")
+      password = env("GRAFANA_CLOUD_API_KEY")
+    }
+    
+    queue_config {
+      capacity          = 10000
+      max_shards        = 50
+      max_samples_per_send = 5000
+    }
+  }
+}
+
+// ====================================
+// LOKI EXPORTER
+// Sends logs to Grafana Cloud Loki
+// ====================================
+otelcol.exporter.loki "grafana_cloud" {
+  forward_to = [loki.write.grafana_cloud.receiver]
+}
+
+loki.write "grafana_cloud" {
+  endpoint {
+    url = env("GRAFANA_CLOUD_LOKI_URL")
+    
+    basic_auth {
+      username = env("GRAFANA_CLOUD_LOKI_USER")
+      password = env("GRAFANA_CLOUD_API_KEY")
+    }
+  }
+}
+
+// ====================================
+// TEMPO EXPORTER
+// Sends traces to Grafana Cloud Tempo
+// ====================================
+otelcol.exporter.otlp "grafana_cloud" {
+  client {
+    endpoint = env("GRAFANA_CLOUD_TEMPO_URL")
+    
+    auth = otelcol.auth.basic.grafana_cloud.handler
+    
+    tls {
+      insecure = false
+    }
+  }
+}
+
+otelcol.auth.basic "grafana_cloud" {
+  username = env("GRAFANA_CLOUD_PROMETHEUS_USER")
+  password = env("GRAFANA_CLOUD_API_KEY")
+}
+
+// ====================================
+// SELF-MONITORING
+// Alloy monitors itself
+// ====================================
+prometheus.scrape "alloy" {
+  targets = [{
+    __address__ = "localhost:12345",
+    job         = "alloy",
+  }]
+  
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+// ====================================
+// DOCKER CONTAINER DISCOVERY
+// Automatically discovers and monitors Docker containers
+// ====================================
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+  
+  filter {
+    name   = "name"
+    values = ["shopnow-*"]
+  }
+}
+
+prometheus.scrape "containers" {
+  targets    = discovery.docker.containers.targets
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+  
+  scrape_interval = "15s"
+  scrape_timeout  = "10s"
+}
+
+// ====================================
+// DOCKER LOGS COLLECTION
+// Collects logs from Docker containers
+// ====================================
+loki.source.docker "containers" {
+  host    = "unix:///var/run/docker.sock"
+  targets = discovery.docker.containers.targets
+  
+  forward_to = [loki.write.grafana_cloud.receiver]
+  
+  relabel_rules = loki.relabel.docker.rules
+}
+
+loki.relabel "docker" {
+  forward_to = [loki.write.grafana_cloud.receiver]
+  
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    target_label  = "container"
+  }
+  
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+}
