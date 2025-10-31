@@ -8,6 +8,10 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: shopnow-postgres
+    labels:
+      com.grafana.service: postgres
+      com.grafana.job: database
+      com.grafana.project: shopnow
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-shopnow}
       POSTGRES_USER: ${POSTGRES_USER:-shopnow}
@@ -28,13 +32,17 @@ services:
   redis:
     image: redis:7-alpine
     container_name: shopnow-redis
+    labels:
+      com.grafana.service: redis
+      com.grafana.job: cache
+      com.grafana.project: shopnow
     command: redis-server --requirepass ${REDIS_PASSWORD:-redis123}
     ports:
       - "6379:6379"
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      test: ["CMD", "redis-cli", "--raw", "--pass", "${REDIS_PASSWORD:-redis123}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -44,6 +52,10 @@ services:
   mongodb:
     image: mongo:6
     container_name: shopnow-mongodb
+    labels:
+      com.grafana.service: mongodb
+      com.grafana.job: database
+      com.grafana.project: shopnow
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USER:-shopnow}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD:-mongo123}
@@ -68,6 +80,10 @@ services:
   alloy:
     image: grafana/alloy:latest
     container_name: shopnow-alloy
+    labels:
+      com.grafana.service: alloy
+      com.grafana.job: observability
+      com.grafana.project: shopnow
     ports:
       - "12345:12345"  # Alloy UI
       - "4317:4317"    # OTLP gRPC
@@ -102,6 +118,10 @@ services:
       context: ./services/api-gateway
       dockerfile: Dockerfile
     container_name: shopnow-api-gateway
+    labels:
+      com.grafana.service: api-gateway
+      com.grafana.job: backend
+      com.grafana.project: shopnow
     ports:
       - "${API_GATEWAY_PORT:-3000}:3000"
     environment:
@@ -112,57 +132,10 @@ services:
       - OTEL_SERVICE_NAME=api-gateway
       - POSTGRES_URL=postgresql://${POSTGRES_USER:-shopnow}:${POSTGRES_PASSWORD:-shopnow123}@postgres:5432/${POSTGRES_DB:-shopnow}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379
-      - PAYMENT_SERVICE_URL=http://payment-service:8001
-      - INVENTORY_SERVICE_URL=http://inventory-service:8002
       - ORDER_SERVICE_URL=http://order-service:8003
-      - RECOMMENDATION_SERVICE_URL=http://recommendation-service:8004
     depends_on:
       - postgres
       - redis
-      - alloy
-    networks:
-      - shopnow-network
-    restart: unless-stopped
-
-  payment-service:
-    build:
-      context: ./services/payment-service
-      dockerfile: Dockerfile
-    container_name: shopnow-payment-service
-    ports:
-      - "${PAYMENT_SERVICE_PORT:-8001}:8001"
-    environment:
-      - SERVICE_NAME=payment-service
-      - PORT=8001
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
-      - OTEL_SERVICE_NAME=payment-service
-      - POSTGRES_URL=postgresql://${POSTGRES_USER:-shopnow}:${POSTGRES_PASSWORD:-shopnow123}@postgres:5432/${POSTGRES_DB:-shopnow}
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379
-    depends_on:
-      - postgres
-      - redis
-      - alloy
-    networks:
-      - shopnow-network
-    restart: unless-stopped
-
-  inventory-service:
-    build:
-      context: ./services/inventory-service
-      dockerfile: Dockerfile
-    container_name: shopnow-inventory-service
-    ports:
-      - "${INVENTORY_SERVICE_PORT:-8002}:8002"
-    environment:
-      - SERVICE_NAME=inventory-service
-      - PORT=8002
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
-      - OTEL_SERVICE_NAME=inventory-service
-      - POSTGRES_URL=postgresql://${POSTGRES_USER:-shopnow}:${POSTGRES_PASSWORD:-shopnow123}@postgres:5432/${POSTGRES_DB:-shopnow}
-      - MONGODB_URL=mongodb://${MONGODB_USER:-shopnow}:${MONGODB_PASSWORD:-mongo123}@mongodb:27017/${MONGODB_DB:-shopnow}?authSource=admin
-    depends_on:
-      - postgres
-      - mongodb
       - alloy
     networks:
       - shopnow-network
@@ -173,6 +146,10 @@ services:
       context: ./services/order-service
       dockerfile: Dockerfile
     container_name: shopnow-order-service
+    labels:
+      com.grafana.service: order-service
+      com.grafana.job: backend
+      com.grafana.project: shopnow
     ports:
       - "${ORDER_SERVICE_PORT:-8003}:8003"
     environment:
@@ -182,56 +159,10 @@ services:
       - OTEL_SERVICE_NAME=order-service
       - POSTGRES_URL=postgresql://${POSTGRES_USER:-shopnow}:${POSTGRES_PASSWORD:-shopnow123}@postgres:5432/${POSTGRES_DB:-shopnow}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379
-      - INVENTORY_SERVICE_URL=http://inventory-service:8002
-      - PAYMENT_SERVICE_URL=http://payment-service:8001
     depends_on:
       - postgres
       - redis
       - alloy
-    networks:
-      - shopnow-network
-    restart: unless-stopped
-
-  recommendation-service:
-    build:
-      context: ./services/recommendation-service
-      dockerfile: Dockerfile
-    container_name: shopnow-recommendation-service
-    ports:
-      - "${RECOMMENDATION_SERVICE_PORT:-8004}:8004"
-    environment:
-      - SERVICE_NAME=recommendation-service
-      - PORT=8004
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
-      - OTEL_SERVICE_NAME=recommendation-service
-      - MONGODB_URL=mongodb://${MONGODB_USER:-shopnow}:${MONGODB_PASSWORD:-mongo123}@mongodb:27017/${MONGODB_DB:-shopnow}?authSource=admin
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379
-    depends_on:
-      - mongodb
-      - redis
-      - alloy
-    networks:
-      - shopnow-network
-    restart: unless-stopped
-
-  # ===============================
-  # FRONTEND
-  # ===============================
-  
-  frontend:
-    build:
-      context: ./services/frontend
-      dockerfile: Dockerfile
-    container_name: shopnow-frontend
-    ports:
-      - "${FRONTEND_PORT:-3001}:3000"
-    environment:
-      - NODE_ENV=${NODE_ENV:-development}
-      - NEXT_PUBLIC_API_URL=http://localhost:${API_GATEWAY_PORT:-3000}
-      - NEXT_PUBLIC_GRAFANA_FARO_URL=${GRAFANA_CLOUD_URL}/faro/api/v1
-      - NEXT_PUBLIC_GRAFANA_FARO_APP_NAME=shopnow-frontend
-    depends_on:
-      - api-gateway
     networks:
       - shopnow-network
     restart: unless-stopped
