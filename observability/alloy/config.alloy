@@ -1,373 +1,370 @@
-// Grafana Alloy Configuration for ShopNow Demo
-// This configuration collects metrics, logs, and traces and sends them to Grafana Cloud
+// Grafana Alloy Configuration for ShopNow Demo  
+// This configuration collects metrics, logs, and traces and sends them to Grafana Cloud  
 
-// ====================================
-// LOGGING CONFIGURATION
-// ====================================
-logging {
-  level  = "info"
-  format = "logfmt"
-}
+// ====================================  
+// LOGGING CONFIGURATION  
+// ====================================  
+logging {  
+  level  = "info"  
+  format = "logfmt"  
+}  
 
-// ====================================
-// OTLP RECEIVER
-// Receives telemetry from OpenTelemetry instrumented services
-// ====================================
-otelcol.receiver.otlp "default" {
-  // gRPC endpoint
-  grpc {
-    endpoint = "0.0.0.0:4317"
-  }
+// ====================================  
+// OTLP RECEIVER  
+// Receives telemetry from OpenTelemetry instrumented services  
+// ====================================  
+otelcol.receiver.otlp "default" {  
+  // gRPC endpoint  
+  grpc {  
+    endpoint = "0.0.0.0:4317"  
+  }  
   
-  // HTTP endpoint
-  http {
-    endpoint = "0.0.0.0:4318"
-  }
+  // HTTP endpoint  
+  http {  
+    endpoint = "0.0.0.0:4318"  
+  }  
 
-  output {
-    metrics = [otelcol.processor.batch.default.input]
-    logs    = [otelcol.processor.batch.default.input]
-    traces  = [otelcol.processor.batch.default.input]
-  }
-}
+  output {  
+    metrics = [otelcol.processor.batch.default.input]  
+    logs    = [otelcol.processor.batch.default.input]  
+    traces  = [otelcol.processor.batch.default.input]  
+  }  
+}  
 
-// ====================================
-// BATCH PROCESSOR
-// Batches telemetry data for efficient transmission
-// ====================================
-otelcol.processor.batch "default" {
-  timeout          = "5s"
-  send_batch_size  = 1024
+// ====================================  
+// BATCH PROCESSOR  
+// Batches telemetry data for efficient transmission  
+// ====================================  
+otelcol.processor.batch "default" {  
+  timeout          = "5s"  
+  send_batch_size  = 1024  
   
-  output {
-    metrics = [otelcol.processor.attributes.add_labels.input]
-    logs    = [otelcol.processor.attributes.add_labels.input]
-    traces  = [otelcol.processor.attributes.add_labels.input]
-  }
-}
+  output {  
+    metrics = [otelcol.processor.attributes.add_labels.input]  
+    logs    = [otelcol.processor.attributes.add_labels.input]  
+    traces  = [otelcol.processor.attributes.add_labels.input]  
+  }  
+}  
 
-// ====================================
-// ATTRIBUTES PROCESSOR
-// Adds common labels to all telemetry
-// ====================================
-otelcol.processor.attributes "add_labels" {
-  action {
-    key    = "environment"
-    value  = "demo"
-    action = "upsert"
-  }
+// ====================================  
+// ATTRIBUTES PROCESSOR  
+// Adds common labels to all telemetry  
+// ====================================  
+otelcol.processor.attributes "add_labels" {  
+  action {  
+    key    = "environment"  
+    value  = "demo"  
+    action = "upsert"  
+  }  
   
-  action {
-    key    = "application"
-    value  = "shopnow"
-    action = "upsert"
-  }
+  action {  
+    key    = "application"  
+    value  = "shopnow"  
+    action = "upsert"  
+  }  
   
-  output {
-    metrics = [otelcol.exporter.prometheus.grafana_cloud.input]
-    logs    = [otelcol.exporter.loki.grafana_cloud.input]
-    traces  = [otelcol.exporter.otlphttp.grafana_cloud.input]
-  }
-}
+  output {  
+    metrics = [otelcol.exporter.prometheus.grafana_cloud.input]  
+    logs    = [otelcol.exporter.loki.grafana_cloud.input]  
+    traces  = [otelcol.exporter.otlp.grafana_cloud.input]  
+  }  
+}  
 
-// ====================================
-// PROMETHEUS EXPORTER
-// Converts OTLP metrics to Prometheus format
-// ====================================
-otelcol.exporter.prometheus "grafana_cloud" {
-  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
-}
+// ====================================  
+// PROMETHEUS EXPORTER  
+// Converts OTLP metrics to Prometheus format  
+// ====================================  
+otelcol.exporter.prometheus "grafana_cloud" {  
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]  
+}  
 
-// ====================================
-// PROMETHEUS REMOTE WRITE
-// Sends metrics to Grafana Cloud Mimir
-// ====================================
-prometheus.remote_write "grafana_cloud" {
-  endpoint {
-    url = env("GRAFANA_CLOUD_PROMETHEUS_URL")
+// ====================================  
+// PROMETHEUS REMOTE WRITE  
+// Sends metrics to Grafana Cloud Mimir  
+// ====================================  
+prometheus.remote_write "grafana_cloud" {  
+  endpoint {  
+    url = env("GRAFANA_CLOUD_PROMETHEUS_URL")  
     
-    basic_auth {
-      username = env("GRAFANA_CLOUD_PROMETHEUS_USER")
-      password = env("GRAFANA_CLOUD_API_KEY")
-    }
+    basic_auth {  
+      username = env("GRAFANA_CLOUD_PROMETHEUS_USER")  
+      password = env("GRAFANA_CLOUD_API_KEY")  
+    }  
     
-    queue_config {
-      capacity          = 10000
-      max_shards        = 50
-      max_samples_per_send = 5000
-    }
-  }
-}
+    queue_config {  
+      capacity          = 10000  
+      max_shards        = 50  
+      max_samples_per_send = 5000  
+    }  
+  }  
+}  
 
-// ====================================
-// LOKI EXPORTER
-// Sends logs to Grafana Cloud Loki
-// ====================================
-otelcol.exporter.loki "grafana_cloud" {
-  forward_to = [loki.process.parse_logs.receiver]
-}
+// ====================================  
+// LOKI EXPORTER  
+// Sends logs to Grafana Cloud Loki  
+// ====================================  
+otelcol.exporter.loki "grafana_cloud" {  
+  forward_to = [loki.process.parse_logs.receiver]  
+}  
 
-loki.write "grafana_cloud" {
-  endpoint {
-    url = env("GRAFANA_CLOUD_LOKI_URL")
+loki.write "grafana_cloud" {  
+  endpoint {  
+    url = env("GRAFANA_CLOUD_LOKI_URL")  
     
-    basic_auth {
-      username = env("GRAFANA_CLOUD_LOKI_USER")
-      password = env("GRAFANA_CLOUD_API_KEY")
-    }
-  }
-}
+    basic_auth {  
+      username = env("GRAFANA_CLOUD_LOKI_USER")  
+      password = env("GRAFANA_CLOUD_API_KEY")  
+    }  
+  }  
+}  
 
-// ====================================
-// TEMPO EXPORTER
-// Sends traces to Grafana Cloud Tempo via OTLP/HTTP
-// ====================================
-otelcol.exporter.otlphttp "grafana_cloud" {
-  client {
-    endpoint = env("GRAFANA_CLOUD_TEMPO_URL")
+// ====================================  
+// TEMPO EXPORTER  
+// Sends traces to Grafana Cloud Tempo via OTLP/gRPC  
+// ====================================  
+otelcol.exporter.otlp "grafana_cloud" {  
+  client {  
+    endpoint = "tempo-prod-10-prod-us-west-0.grafana.net:443"  
+    auth     = otelcol.auth.basic.grafana_cloud.handler  
     
-    auth = otelcol.auth.basic.grafana_cloud.handler
-    
-    tls {
-      insecure = false
-    }
-  }
-}
+    tls {  
+      insecure             = false  
+      insecure_skip_verify = false  
+    }  
+  }  
+}  
 
-otelcol.auth.basic "grafana_cloud" {
-  username = env("GRAFANA_CLOUD_TEMPO_USER")
-  password = env("GRAFANA_CLOUD_API_KEY")
-}
+otelcol.auth.basic "grafana_cloud" {  
+  username = env("GRAFANA_CLOUD_TEMPO_USER")  
+  password = env("GRAFANA_CLOUD_API_KEY")  
+}  
 
-// ====================================
-// SELF-MONITORING
-// Alloy monitors itself
-// ====================================
-prometheus.scrape "alloy" {
-  targets = [{
-    __address__ = "localhost:12345",
-    job         = "alloy",
-  }]
+// ====================================  
+// SELF-MONITORING  
+// Alloy monitors itself  
+// ====================================  
+prometheus.scrape "alloy" {  
+  targets = [{  
+    __address__ = "localhost:12345",  
+    job         = "alloy",  
+  }]  
   
-  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
-}
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]  
+}  
 
-// ====================================
-// DOCKER CONTAINER DISCOVERY
-// Automatically discovers and monitors Docker containers
-// ====================================
-discovery.docker "containers" {
-  host = "unix:///var/run/docker.sock"
+// ====================================  
+// DOCKER CONTAINER DISCOVERY  
+// Automatically discovers and monitors Docker containers  
+// ====================================  
+discovery.docker "containers" {  
+  host = "unix:///var/run/docker.sock"  
   
-  filter {
-    name   = "name"
-    values = ["shopnow-*"]
-  }
-}
+  filter {  
+    name   = "name"  
+    values = ["shopnow-*"]  
+  }  
+}  
 
-prometheus.scrape "containers" {
-  targets    = discovery.docker.containers.targets
-  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+prometheus.scrape "containers" {  
+  targets    = discovery.docker.containers.targets  
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]  
   
-  scrape_interval = "15s"
-  scrape_timeout  = "10s"
-}
+  scrape_interval = "15s"  
+  scrape_timeout  = "10s"  
+}  
 
-// ====================================
-// DOCKER LOGS COLLECTION
-// Collects logs from Docker containers
-// ====================================
-loki.source.docker "containers" {
-  host    = "unix:///var/run/docker.sock"
-  targets = discovery.docker.containers.targets
+// ====================================  
+// DOCKER LOGS COLLECTION  
+// Collects logs from Docker containers  
+// ====================================  
+loki.source.docker "containers" {  
+  host    = "unix:///var/run/docker.sock"  
+  targets = discovery.docker.containers.targets  
   
-  forward_to = [loki.relabel.docker.receiver]
+  forward_to = [loki.relabel.docker.receiver]  
   
-  relabel_rules = loki.relabel.docker.rules
-}
+  relabel_rules = loki.relabel.docker.rules  
+}  
 
-loki.relabel "docker" {
-  forward_to = [loki.process.parse_logs.receiver]
+loki.relabel "docker" {  
+  forward_to = [loki.process.parse_logs.receiver]  
   
-  // Extraer nombre del contenedor (remover la barra inicial)
-  rule {
-    source_labels = ["__meta_docker_container_name"]
-    regex         = "/?(.*)"
-    target_label  = "container"
-    replacement   = "$1"
-  }
+  // Extraer nombre del contenedor (remover la barra inicial)  
+  rule {  
+    source_labels = ["__meta_docker_container_name"]  
+    regex         = "/?(.*)"  
+    target_label  = "container"  
+    replacement   = "$1"  
+  }  
   
-  // Usar label personalizada com.grafana.service
-  rule {
-    source_labels = ["__meta_docker_container_label_com_grafana_service"]
-    regex         = "(.+)"
-    target_label  = "service_name"
-    replacement   = "$1"
-  }
+  // Usar label personalizada com.grafana.service  
+  rule {  
+    source_labels = ["__meta_docker_container_label_com_grafana_service"]  
+    regex         = "(.+)"  
+    target_label  = "service_name"  
+    replacement   = "$1"  
+  }  
   
-  // Fallback: extraer service del nombre del contenedor (shopnow-xxxx)
-  rule {
-    source_labels = ["__meta_docker_container_name"]
-    regex         = "/shopnow-(.*)"
-    target_label  = "service_name"
-    replacement   = "$1"
-  }
+  // Fallback: extraer service del nombre del contenedor (shopnow-xxxx)  
+  rule {  
+    source_labels = ["__meta_docker_container_name"]  
+    regex         = "/shopnow-(.*)"  
+    target_label  = "service_name"  
+    replacement   = "$1"  
+  }  
   
-  // Label job
-  rule {
-    source_labels = ["__meta_docker_container_label_com_grafana_job"]
-    regex         = "(.+)"
-    target_label  = "job"
-    replacement   = "$1"
-  }
+  // Label job  
+  rule {  
+    source_labels = ["__meta_docker_container_label_com_grafana_job"]  
+    regex         = "(.+)"  
+    target_label  = "job"  
+    replacement   = "$1"  
+  }  
   
-  // Label project
-  rule {
-    source_labels = ["__meta_docker_container_label_com_grafana_project"]
-    regex         = "(.+)"
-    target_label  = "project"
-    replacement   = "$1"
-  }
+  // Label project  
+  rule {  
+    source_labels = ["__meta_docker_container_label_com_grafana_project"]  
+    regex         = "(.+)"  
+    target_label  = "project"  
+    replacement   = "$1"  
+  }  
   
-  // Container ID
-  rule {
-    source_labels = ["__meta_docker_container_id"]
-    target_label  = "container_id"
-  }
-}
+  // Container ID  
+  rule {  
+    source_labels = ["__meta_docker_container_id"]  
+    target_label  = "container_id"  
+  }  
+}  
 
-// ====================================
-// LOG PROCESSING PIPELINE
-// Parses and transforms logs before sending to Loki
-// ====================================
-loki.process "parse_logs" {
-  forward_to = [loki.write.grafana_cloud.receiver]
+// ====================================  
+// LOG PROCESSING PIPELINE  
+// Parses and transforms logs before sending to Loki  
+// ====================================  
+loki.process "parse_logs" {  
+  forward_to = [loki.write.grafana_cloud.receiver]  
   
-  // ========================================
-  // MONGODB: Parse JSON and map s=I/W/E/F
-  // ========================================
-  stage.match {
-    selector = "{service_name=\"mongodb\"}"
+  // ========================================  
+  // MONGODB: Parse JSON and map s=I/W/E/F  
+  // ========================================  
+  stage.match {  
+    selector = "{service_name=\"mongodb\"}"  
     
-    stage.json {
-      expressions = {
-        mongo_severity  = "s",
-        mongo_component = "c",
-        mongo_message   = "msg",
-        mongo_ctx       = "ctx",
-      }
-    }
+    stage.json {  
+      expressions = {  
+        mongo_severity  = "s",  
+        mongo_component = "c",  
+        mongo_message   = "msg",  
+        mongo_ctx       = "ctx",  
+      }  
+    }  
     
-    stage.template {
-      source   = "detected_level"
-      template = "{{ if eq .mongo_severity \"I\" }}info{{ else if eq .mongo_severity \"W\" }}warn{{ else if eq .mongo_severity \"E\" }}error{{ else if eq .mongo_severity \"F\" }}critical{{ else if eq .mongo_severity \"D\" }}debug{{ else }}info{{ end }}"
-    }
+    stage.template {  
+      source   = "detected_level"  
+      template = "{{ if eq .mongo_severity \"I\" }}info{{ else if eq .mongo_severity \"W\" }}warn{{ else if eq .mongo_severity \"E\" }}error{{ else if eq .mongo_severity \"F\" }}critical{{ else if eq .mongo_severity \"D\" }}debug{{ else }}info{{ end }}"  
+    }  
     
-    stage.structured_metadata {
-      values = {
-        detected_level  = "detected_level",
-        mongo_severity  = "mongo_severity",
-        mongo_component = "mongo_component",
-      }
-    }
-  }
+    // CAMBIO CRÍTICO: usar stage.labels en lugar de stage.structured_metadata  
+    stage.labels {  
+      values = {  
+        detected_level = "",  
+      }  
+    }  
+  }  
   
-  // ========================================
-  // POSTGRESQL: Extract level from text
-  // ========================================
-  stage.match {
-    selector = "{service_name=\"postgres\"}"
+  // ========================================  
+  // POSTGRESQL: Extract level from text  
+  // ========================================  
+  stage.match {  
+    selector = "{service_name=\"postgres\"}"  
     
-    stage.regex {
-      expression = "(?P<pg_level>LOG|ERROR|WARNING|FATAL|PANIC|INFO|DEBUG)"
-    }
+    stage.regex {  
+      expression = "(?P<pg_level>LOG|ERROR|WARNING|FATAL|PANIC|INFO|DEBUG)"  
+    }  
     
-    stage.template {
-      source   = "detected_level"
-      template = "{{ if eq .pg_level \"LOG\" }}info{{ else if eq .pg_level \"INFO\" }}info{{ else if eq .pg_level \"DEBUG\" }}debug{{ else if eq .pg_level \"WARNING\" }}warn{{ else if eq .pg_level \"ERROR\" }}error{{ else if eq .pg_level \"FATAL\" }}critical{{ else if eq .pg_level \"PANIC\" }}critical{{ else }}info{{ end }}"
-    }
+    stage.template {  
+      source   = "detected_level"  
+      template = "{{ if eq .pg_level \"LOG\" }}info{{ else if eq .pg_level \"INFO\" }}info{{ else if eq .pg_level \"DEBUG\" }}debug{{ else if eq .pg_level \"WARNING\" }}warn{{ else if eq .pg_level \"ERROR\" }}error{{ else if eq .pg_level \"FATAL\" }}critical{{ else if eq .pg_level \"PANIC\" }}critical{{ else }}info{{ end }}"  
+    }  
     
-    stage.structured_metadata {
-      values = {
-        detected_level = "detected_level",
-        pg_level       = "pg_level",
-      }
-    }
-  }
+    stage.labels {  
+      values = {  
+        detected_level = "",  
+      }  
+    }  
+  }  
   
-  // ========================================
-  // REDIS: Parse Redis log format
-  // ========================================
-  stage.match {
-    selector = "{service_name=\"redis\"}"
+  // ========================================  
+  // REDIS: Parse Redis log format  
+  // ========================================  
+  stage.match {  
+    selector = "{service_name=\"redis\"}"  
     
-    // Extraer símbolo Redis
-    stage.regex {
-      expression = "\\[\\d+\\]\\s+\\d+\\s+\\w+\\s+[\\d:]+\\.\\d+\\s+(?P<redis_symbol>[*#.-])"
-    }
+    // Extraer símbolo Redis  
+    stage.regex {  
+      expression = "\\[\\d+\\]\\s+\\d+\\s+\\w+\\s+[\\d:]+\\.\\d+\\s+(?P<redis_symbol>[*#.-])"  
+    }  
     
-    // Detectar si hay SECURITY en el mensaje
-    stage.regex {
-      expression = "(?i)(?P<has_security>SECURITY)"
-    }
+    // Detectar si hay SECURITY en el mensaje  
+    stage.regex {  
+      expression = "(?i)(?P<has_security>SECURITY)"  
+    }  
     
-    // Determinar nivel en UN SOLO template
-    stage.template {
-      source   = "detected_level"
-      template = "{{ if .has_security }}error{{ else if eq .redis_symbol \".\" }}debug{{ else if eq .redis_symbol \"*\" }}info{{ else if eq .redis_symbol \"#\" }}warn{{ else if eq .redis_symbol \"-\" }}notice{{ else }}info{{ end }}"
-    }
+    // Determinar nivel en UN SOLO template  
+    stage.template {  
+      source   = "detected_level"  
+      template = "{{ if .has_security }}error{{ else if eq .redis_symbol \".\" }}debug{{ else if eq .redis_symbol \"*\" }}info{{ else if eq .redis_symbol \"#\" }}warn{{ else if eq .redis_symbol \"-\" }}notice{{ else }}info{{ end }}"  
+    }  
     
-    stage.structured_metadata {
-      values = {
-        detected_level = "detected_level",
-        redis_symbol   = "redis_symbol",
-      }
-    }
-  }
+    stage.labels {  
+      values = {  
+        detected_level = "",  
+      }  
+    }  
+  }  
   
-  // ========================================
-  // NODE.JS SERVICES & ALLOY: Parse LOGFMT
-  // ========================================
-  stage.match {
-    selector = "{service_name=~\"api-gateway|order-service|payment-service|inventory-service|recommendation-service|alloy\"}"
+  // ========================================  
+  // NODE.JS SERVICES & ALLOY: Parse LOGFMT  
+  // ========================================  
+  stage.match {  
+    selector = "{service_name=~\"api-gateway|order-service|payment-service|inventory-service|recommendation-service|alloy\"}"  
     
-    // Parsear LOGFMT (level=info msg="..." etc.)
-    stage.logfmt {
-      mapping = {
-        extracted_level = "level",
-        msg             = "msg",
-        component_id    = "component_id",
-      }
-    }
+    // Parsear LOGFMT (level=info msg="..." etc.)  
+    stage.logfmt {  
+      mapping = {  
+        extracted_level = "level",  
+        msg             = "msg",  
+        component_id    = "component_id",  
+      }  
+    }  
     
-    // Mapear el nivel extraído
-    stage.template {
-      source   = "detected_level"
-      template = "{{ if .extracted_level }}{{ .extracted_level | ToLower }}{{ else }}info{{ end }}"
-    }
+    // Mapear el nivel extraído  
+    stage.template {  
+      source   = "detected_level"  
+      template = "{{ if .extracted_level }}{{ .extracted_level | ToLower }}{{ else }}info{{ end }}"  
+    }  
     
-    stage.structured_metadata {
-      values = {
-        detected_level = "detected_level",
-      }
-    }
-  }
+    stage.labels {  
+      values = {  
+        detected_level = "",  
+      }  
+    }  
+  }  
   
-  // ========================================
-  // FALLBACK: Si no se detectó nivel, asignar info
-  // ========================================
-  stage.match {
-    selector = "{detected_level=\"\"}"
+  // ========================================  
+  // FALLBACK: Si no se detectó nivel, asignar info  
+  // ========================================  
+  stage.match {  
+    selector = "{detected_level=\"\"}"  
     
-    stage.template {
-      source   = "detected_level"
-      template = "info"
-    }
+    stage.template {  
+      source   = "detected_level"  
+      template = "info"  
+    }  
     
-    stage.structured_metadata {
-      values = {
-        detected_level = "detected_level",
-      }
-    }
-  }
-}
+    stage.labels {  
+      values = {  
+        detected_level = "",  
+      }  
+    }  
+  }  
+}  
