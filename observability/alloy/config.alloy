@@ -306,20 +306,20 @@ loki.process "parse_logs" {
   stage.match {
     selector = "{service_name=\"redis\"}"
     
-    // Primero detectar ataques de seguridad
-    stage.regex {
-      expression = "(?i)(?P<is_attack>SECURITY ATTACK)"
-    }
-    
     // Redis usa símbolos: . = debug, * = verbose, # = warning, - = notice
     stage.regex {
       expression = "\\[\\d+\\]\\s+\\d+\\s+\\w+\\s+[\\d:]+\\.\\d+\\s+(?P<redis_symbol>[*#.-])"
     }
     
-    // Determinar nivel: si hay ataque = error, sino usar símbolo
+    // Detectar ataques de seguridad CON GRUPO NOMBRADO
+    stage.regex {
+      expression = "(?i)(?P<is_security_attack>SECURITY)"
+    }
+    
+    // Determinar nivel: primero chequear si hay ataque
     stage.template {
       source   = "detected_level"
-      template = "{{ if .is_attack }}error{{ else if eq .redis_symbol \".\" }}debug{{ else if eq .redis_symbol \"*\" }}info{{ else if eq .redis_symbol \"#\" }}warn{{ else if eq .redis_symbol \"-\" }}notice{{ else }}info{{ end }}"
+      template = "{{ if .is_security_attack }}error{{ else if eq .redis_symbol \".\" }}debug{{ else if eq .redis_symbol \"*\" }}info{{ else if eq .redis_symbol \"#\" }}warn{{ else if eq .redis_symbol \"-\" }}notice{{ else }}info{{ end }}"
     }
     
     stage.structured_metadata {
