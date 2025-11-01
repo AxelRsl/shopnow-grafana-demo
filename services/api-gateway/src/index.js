@@ -6,16 +6,60 @@ const cors = require('cors');
 const { Pool } = require('pg');
 const { createClient } = require('redis');
 const axios = require('axios');
+const { SeverityNumber } = require('@opentelemetry/api-logs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Simple structured logger
+// OpenTelemetry Logger (initialized in tracing.js)
+const otelLogger = global.otelLogger;
+
+// Simple structured logger that sends to OTLP
 const log = {
-  info: (msg, ...args) => console.log(`level=info msg="${msg}"`, ...args),
-  warn: (msg, ...args) => console.log(`level=warn msg="${msg}"`, ...args),
-  error: (msg, ...args) => console.log(`level=error msg="${msg}"`, ...args),
-  debug: (msg, ...args) => console.log(`level=debug msg="${msg}"`, ...args),
+  info: (msg, ...args) => {
+    console.log(`level=info msg="${msg}"`, ...args);
+    if (otelLogger) {
+      otelLogger.emit({
+        severityNumber: SeverityNumber.INFO,
+        severityText: 'INFO',
+        body: msg,
+        attributes: { args: args.length > 0 ? JSON.stringify(args) : undefined },
+      });
+    }
+  },
+  warn: (msg, ...args) => {
+    console.log(`level=warn msg="${msg}"`, ...args);
+    if (otelLogger) {
+      otelLogger.emit({
+        severityNumber: SeverityNumber.WARN,
+        severityText: 'WARN',
+        body: msg,
+        attributes: { args: args.length > 0 ? JSON.stringify(args) : undefined },
+      });
+    }
+  },
+  error: (msg, ...args) => {
+    console.log(`level=error msg="${msg}"`, ...args);
+    if (otelLogger) {
+      otelLogger.emit({
+        severityNumber: SeverityNumber.ERROR,
+        severityText: 'ERROR',
+        body: msg,
+        attributes: { args: args.length > 0 ? JSON.stringify(args) : undefined },
+      });
+    }
+  },
+  debug: (msg, ...args) => {
+    console.log(`level=debug msg="${msg}"`, ...args);
+    if (otelLogger) {
+      otelLogger.emit({
+        severityNumber: SeverityNumber.DEBUG,
+        severityText: 'DEBUG',
+        body: msg,
+        attributes: { args: args.length > 0 ? JSON.stringify(args) : undefined },
+      });
+    }
+  },
 };
 
 // Middleware

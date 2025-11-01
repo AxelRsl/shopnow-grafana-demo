@@ -3,7 +3,9 @@ const { NodeSDK } = require('@opentelemetry/sdk-node');
 const { getNodeAutoInstrumentations } = require('@opentelemetry/auto-instrumentations-node');
 const { OTLPTraceExporter } = require('@opentelemetry/exporter-trace-otlp-http');
 const { OTLPMetricExporter } = require('@opentelemetry/exporter-metrics-otlp-http');
+const { OTLPLogExporter } = require('@opentelemetry/exporter-logs-otlp-http');
 const { PeriodicExportingMetricReader } = require('@opentelemetry/sdk-metrics');
+const { LoggerProvider, SimpleLogRecordProcessor } = require('@opentelemetry/sdk-logs');
 const { Resource } = require('@opentelemetry/resources');
 const { SemanticResourceAttributes } = require('@opentelemetry/semantic-conventions');
 
@@ -49,8 +51,21 @@ const sdk = new NodeSDK({
 // Start the SDK
 sdk.start();
 
+// ⭐ Configure Logs Exporter (OTLP)
+const logExporter = new OTLPLogExporter({
+  url: `${process.env.OTEL_EXPORTER_OTLP_ENDPOINT}/v1/logs`,
+  headers: {},
+});
+
+const loggerProvider = new LoggerProvider({ resource });
+loggerProvider.addLogRecordProcessor(new SimpleLogRecordProcessor(logExporter));
+
+// Export logger for use in application
+global.otelLogger = loggerProvider.getLogger('api-gateway', '1.0.0');
+
 console.log('🔭 OpenTelemetry instrumentation started for api-gateway');
 console.log(`📡 Sending telemetry to: ${process.env.OTEL_EXPORTER_OTLP_ENDPOINT}`);
+console.log('📝 Logs, traces, and metrics enabled');
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
