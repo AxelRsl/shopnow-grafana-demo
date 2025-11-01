@@ -77,37 +77,45 @@ services:
   # OBSERVABILITY - GRAFANA ALLOY
   # ===============================
   
-  alloy:
-    image: grafana/alloy:latest
-    container_name: shopnow-alloy
-    labels:
-      com.grafana.service: alloy
-      com.grafana.job: observability
-      com.grafana.project: shopnow
-    ports:
-      - "12345:12345"  # Alloy UI
-      - "4317:4317"    # OTLP gRPC
-      - "4318:4318"    # OTLP HTTP
-    volumes:
-      - ./observability/alloy/config.alloy:/etc/alloy/config.alloy
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
-    environment:
-      - GRAFANA_CLOUD_API_KEY=${GRAFANA_CLOUD_API_KEY}
-      - GRAFANA_CLOUD_PROMETHEUS_URL=${GRAFANA_CLOUD_PROMETHEUS_URL}
-      - GRAFANA_CLOUD_PROMETHEUS_USER=${GRAFANA_CLOUD_PROMETHEUS_USER}
-      - GRAFANA_CLOUD_LOKI_URL=${GRAFANA_CLOUD_LOKI_URL}
-      - GRAFANA_CLOUD_LOKI_USER=${GRAFANA_CLOUD_LOKI_USER}
-      - GRAFANA_CLOUD_TEMPO_URL=${GRAFANA_CLOUD_TEMPO_URL}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      mongodb:
-        condition: service_healthy
-    networks:
-      - shopnow-network
+  alloy:  
+    image: grafana/alloy:latest  
+    container_name: shopnow-alloy  
+    labels:  
+      com.grafana.service: alloy  
+      com.grafana.job: observability  
+      com.grafana.project: shopnow  
+    ports:  
+      - "12345:12345"  # Alloy UI  
+      - "4317:4317"    # OTLP gRPC  
+      - "4318:4318"    # OTLP HTTP  
+    volumes:  
+      - ./observability/alloy/config.alloy:/etc/alloy/config.alloy  
+      - /var/run/docker.sock:/var/run/docker.sock:ro  
+    command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy  
+    environment:  
+      # Prometheus/Mimir  
+      - GRAFANA_CLOUD_PROMETHEUS_URL=${GRAFANA_CLOUD_PROMETHEUS_URL}  
+      - GRAFANA_CLOUD_PROMETHEUS_USER=${GRAFANA_CLOUD_PROMETHEUS_USER}  
+      - GRAFANA_CLOUD_PROMETHEUS_PASSWORD=${GRAFANA_CLOUD_API_KEY}  
+      
+      # Loki  
+      - GRAFANA_CLOUD_LOKI_URL=${GRAFANA_CLOUD_LOKI_URL}  
+      - GRAFANA_CLOUD_LOKI_USER=${GRAFANA_CLOUD_LOKI_USER}  
+      - GRAFANA_CLOUD_LOKI_PASSWORD=${GRAFANA_CLOUD_API_KEY}  
+      
+      # Tempo  
+      - GRAFANA_CLOUD_TEMPO_ENDPOINT=${GRAFANA_CLOUD_TEMPO_ENDPOINT}  
+      - GRAFANA_CLOUD_TEMPO_USER=${GRAFANA_CLOUD_TEMPO_USER}  
+      - GRAFANA_CLOUD_TEMPO_PASSWORD=${GRAFANA_CLOUD_API_KEY}  
+    depends_on:  
+      postgres:  
+        condition: service_healthy  
+      redis:  
+        condition: service_healthy  
+      mongodb:  
+        condition: service_healthy  
+    networks:  
+      - shopnow-network  
 
   # ===============================
   # BACKEND MICROSERVICES
