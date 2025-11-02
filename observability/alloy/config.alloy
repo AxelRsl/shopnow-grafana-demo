@@ -376,13 +376,39 @@ loki.process "parse_logs" {
   forward_to = [loki.write.grafana_cloud.receiver]    
   
   // ========================================  
-  // 🚫 DROP: Health Check Logs (DEMO)  
-  // Elimina logs de conexiones de health checks en bases de datos
-  // Estos logs son ruido - solo muestran que el health check funciona
-  // Para demo, queremos ver solo actividad real de la aplicación
+  // 🚫 DEMO: Drop MongoDB Internal Noise  
+  // Filtra logs técnicos internos de MongoDB que no aportan valor en demos
+  // - Health checks: conexiones desde 127.0.0.1
+  // - WiredTiger: logs internos del motor de almacenamiento
+  // - Client metadata: información de conexión de clientes
   // ========================================  
   stage.match {  
-    selector = "{service_name=~\"mongodb|postgres|redis\"}"  
+    selector = "{service_name=\"mongodb\"}"  
+    
+    // Drop connection logs (health checks y conexiones internas)
+    stage.drop {  
+      expression = "(Connection accepted|Connection ended)"  
+      drop_counter_reason = "health_check"  
+    }  
+    
+    // Drop WiredTiger internal logs (motor de almacenamiento)
+    stage.drop {  
+      expression = "(WiredTiger message|WiredTiger opened)"  
+      drop_counter_reason = "wiredtiger_internal"  
+    }  
+    
+    // Drop client metadata (info de conexión de clientes)
+    stage.drop {  
+      expression = "client metadata"  
+      drop_counter_reason = "client_metadata"  
+    }  
+  }
+  
+  // ========================================  
+  // 🚫 DEMO: Drop PostgreSQL & Redis Health Checks
+  // ========================================  
+  stage.match {  
+    selector = "{service_name=~\"postgres|redis\"}"  
     
     // Drop health check connection logs (127.0.0.1 = localhost health checks)
     stage.drop {  
