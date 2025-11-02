@@ -9,6 +9,31 @@ const { LoggerProvider, SimpleLogRecordProcessor } = require('@opentelemetry/sdk
 const { Resource } = require('@opentelemetry/resources');
 const { SemanticResourceAttributes } = require('@opentelemetry/semantic-conventions');
 
+// Initialize Pyroscope for continuous profiling
+const Pyroscope = require('@pyroscope/nodejs');
+
+Pyroscope.init({
+  serverAddress: process.env.PYROSCOPE_SERVER_ADDRESS || 'http://alloy:4040',
+  appName: process.env.OTEL_SERVICE_NAME || 'order-service',
+  tags: {
+    env: process.env.NODE_ENV || 'development',
+    service: 'order-service',
+    version: '1.0.0',
+    region: process.env.REGION || 'us-west-0',
+    instance: process.env.HOSTNAME || 'local',
+    platform: 'docker'
+  },
+  // Note: CPU and Heap profiling are enabled by default in @pyroscope/nodejs
+  // The SDK automatically collects:
+  // - process_cpu: CPU time consumed by functions
+  // - memory:inuse_space: Heap memory currently in use
+  // - memory:inuse_objects: Number of allocated objects
+  // - memory:alloc_space: Total memory allocated (including freed)
+  // - memory:alloc_objects: Total objects allocated
+});
+
+Pyroscope.start();
+
 // Configure OpenTelemetry Resource
 const resource = new Resource({
   [SemanticResourceAttributes.SERVICE_NAME]: process.env.OTEL_SERVICE_NAME || 'order-service',

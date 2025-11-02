@@ -135,6 +135,30 @@ otelcol.auth.basic "grafana_cloud_tempo" {
   password = env("GRAFANA_CLOUD_TEMPO_PASSWORD")  
 }   
 
+// ====================================
+// PYROSCOPE PROFILING
+// Receives and sends continuous profiling data
+// ====================================
+pyroscope.receive_http "default" {
+  http {
+    listen_address = "0.0.0.0"
+    listen_port    = 4040
+  }
+
+  forward_to = [pyroscope.write.grafana_cloud.receiver]
+}
+
+pyroscope.write "grafana_cloud" {
+  endpoint {
+    url = env("GRAFANA_CLOUD_PYROSCOPE_URL")
+    
+    basic_auth {
+      username = env("GRAFANA_CLOUD_PYROSCOPE_USER")
+      password = env("GRAFANA_CLOUD_PYROSCOPE_PASSWORD")
+    }
+  }
+}
+
 // ====================================    
 // SELF-MONITORING    
 // Alloy monitors itself    
@@ -176,10 +200,8 @@ prometheus.scrape "containers" {
 loki.source.docker "containers" {    
   host    = "unix:///var/run/docker.sock"    
   targets = discovery.docker.containers.targets    
-  
   forward_to = [loki.relabel.docker.receiver]    
-  
-  relabel_rules = loki.relabel.docker.rules    
+
 }    
 
 loki.relabel "docker" {    
@@ -230,6 +252,13 @@ loki.relabel "docker" {
     source_labels = ["__meta_docker_container_id"]    
     target_label  = "container_id"    
   }    
+  
+  // ⭐⭐⭐ CRÍTICO: Mantener todos los logs que tengan service_name ⭐⭐⭐  
+  rule {  
+    action        = "keep"  
+    source_labels = ["service_name"]  
+    regex         = ".+"  
+  }  
 }    
 
 // ====================================    

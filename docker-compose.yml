@@ -88,6 +88,7 @@ services:
       - "12345:12345"  # Alloy UI  
       - "4317:4317"    # OTLP gRPC  
       - "4318:4318"    # OTLP HTTP  
+      - "4040:4040"    # Pyroscope Profiles
     volumes:  
       - ./observability/alloy/config.alloy:/etc/alloy/config.alloy  
       - //var/run/docker.sock:/var/run/docker.sock:ro  
@@ -107,6 +108,11 @@ services:
       - GRAFANA_CLOUD_TEMPO_ENDPOINT=${GRAFANA_CLOUD_TEMPO_ENDPOINT}  
       - GRAFANA_CLOUD_TEMPO_USER=${GRAFANA_CLOUD_TEMPO_USER}  
       - GRAFANA_CLOUD_TEMPO_PASSWORD=${GRAFANA_CLOUD_API_KEY}  
+      
+      # Pyroscope
+      - GRAFANA_CLOUD_PYROSCOPE_URL=${GRAFANA_CLOUD_PYROSCOPE_URL}
+      - GRAFANA_CLOUD_PYROSCOPE_USER=${GRAFANA_CLOUD_PYROSCOPE_USER}
+      - GRAFANA_CLOUD_PYROSCOPE_PASSWORD=${GRAFANA_CLOUD_PYROSCOPE_PASSWORD}
     depends_on:  
       postgres:  
         condition: service_healthy  
@@ -138,6 +144,7 @@ services:
       - PORT=3000
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
       - OTEL_SERVICE_NAME=api-gateway
+      - PYROSCOPE_SERVER_ADDRESS=http://alloy:4040
       - POSTGRES_URL=postgresql://${POSTGRES_USER:-shopnow}:${POSTGRES_PASSWORD:-shopnow123}@postgres:5432/${POSTGRES_DB:-shopnow}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379
       - ORDER_SERVICE_URL=http://order-service:8003
@@ -165,6 +172,7 @@ services:
       - PORT=8003
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
       - OTEL_SERVICE_NAME=order-service
+      - PYROSCOPE_SERVER_ADDRESS=http://alloy:4040
       - POSTGRES_URL=postgresql://${POSTGRES_USER:-shopnow}:${POSTGRES_PASSWORD:-shopnow123}@postgres:5432/${POSTGRES_DB:-shopnow}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379
     depends_on:
