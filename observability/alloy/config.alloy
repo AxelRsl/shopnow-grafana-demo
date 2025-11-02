@@ -105,10 +105,55 @@ prometheus.remote_write "grafana_cloud" {
 // Sends logs to Grafana Cloud Loki      
 // ====================================      
 otelcol.exporter.loki "grafana_cloud" {      
-  forward_to = [loki.relabel.otlp_logs.receiver]      
+  forward_to = [loki.relabel.normalize_otlp_level.receiver]  // ⬅️ Normalizar niveles primero
 }
 
-// Pipeline for OTLP logs (already structured, no parsing needed)
+// Normalizar el label "level" de logs OTLP (mayúsculas → minúsculas)  
+loki.relabel "normalize_otlp_level" {  
+  forward_to = [loki.relabel.otlp_logs.receiver]  
+  
+  // DEBUG → debug  
+  rule {  
+    source_labels = ["level"]  
+    regex         = "DEBUG"  
+    target_label  = "level"  
+    replacement   = "debug"  
+  }  
+  
+  // INFO → info  
+  rule {  
+    source_labels = ["level"]  
+    regex         = "INFO"  
+    target_label  = "level"  
+    replacement   = "info"  
+  }  
+  
+  // WARN/WARNING → warn  
+  rule {  
+    source_labels = ["level"]  
+    regex         = "WARN(ING)?"  
+    target_label  = "level"  
+    replacement   = "warn"  
+  }  
+  
+  // ERROR → error  
+  rule {  
+    source_labels = ["level"]  
+    regex         = "ERROR"  
+    target_label  = "level"  
+    replacement   = "error"  
+  }  
+  
+  // FATAL/CRITICAL → critical  
+  rule {  
+    source_labels = ["level"]  
+    regex         = "FATAL|CRITICAL"  
+    target_label  = "level"  
+    replacement   = "critical"  
+  }  
+}
+
+// Pipeline for OTLP logs (already structured and normalized)
 loki.relabel "otlp_logs" {
   forward_to = [loki.write.grafana_cloud.receiver]
   
@@ -343,7 +388,7 @@ loki.process "parse_logs" {
     
     stage.labels {    
       values = {    
-        detected_level = "",    
+        level = "detected_level",  // Mapear detected_level -> level
       }    
     }    
   }    
@@ -365,7 +410,7 @@ loki.process "parse_logs" {
     
     stage.labels {    
       values = {    
-        detected_level = "",    
+        level = "detected_level",  // Mapear detected_level -> level
       }    
     }    
   }    
@@ -394,7 +439,7 @@ loki.process "parse_logs" {
     
     stage.labels {    
       values = {    
-        detected_level = "",    
+        level = "detected_level",  // Mapear detected_level -> level
       }    
     }    
   }    
@@ -414,15 +459,16 @@ loki.process "parse_logs" {
       }    
     }    
     
-    // Mapear el nivel extraído    
+    // Mapear el nivel extraído y mantenerlo en minúsculas
     stage.template {    
       source   = "detected_level"    
       template = "{{ if .extracted_level }}{{ .extracted_level | ToLower }}{{ else }}info{{ end }}"    
     }    
     
+    // Agregar level como label permanente
     stage.labels {    
       values = {    
-        detected_level = "",    
+        level = "detected_level",  // Mapear detected_level -> level
       }    
     }    
   }    
@@ -431,16 +477,16 @@ loki.process "parse_logs" {
   // FALLBACK: Si no se detectó nivel, asignar info    
   // ========================================    
   stage.match {    
-    selector = "{detected_level=\"\"}"    
+    selector = "{level=\"\"}"  // Cambiar de detected_level a level
     
     stage.template {    
-      source   = "detected_level"    
+      source   = "level"  // Cambiar de detected_level a level
       template = "info"    
     }    
     
     stage.labels {    
       values = {    
-        detected_level = "",    
+        level = "",  // Mantener el label level (vacío solo actualiza)
       }    
     }    
   }    
