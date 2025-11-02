@@ -375,6 +375,22 @@ loki.process "docker_json" {
 loki.process "parse_logs" {    
   forward_to = [loki.write.grafana_cloud.receiver]    
   
+  // ========================================  
+  // 🚫 DROP: Health Check Logs (DEMO)  
+  // Elimina logs de conexiones de health checks en bases de datos
+  // Estos logs son ruido - solo muestran que el health check funciona
+  // Para demo, queremos ver solo actividad real de la aplicación
+  // ========================================  
+  stage.match {  
+    selector = "{service_name=~\"mongodb|postgres|redis\"}"  
+    
+    // Drop health check connection logs (127.0.0.1 = localhost health checks)
+    stage.drop {  
+      expression = "(Connection accepted|Connection ended|connection received).*127\\.0\\.0\\.1"  
+      drop_counter_reason = "health_check_noise"  
+    }  
+  }  
+  
   // ========================================    
   // MONGODB: Parse JSON and map s=I/W/E/F    
   // ========================================    
