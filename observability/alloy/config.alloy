@@ -261,14 +261,21 @@ prometheus.scrape "containers" {
 
 // ====================================  
 // DOCKER LOGS - MÉTODO ROBUSTO VIA ARCHIVOS  
-// Usa loki.source.file en lugar de loki.source.docker  
+// SOLO para servicios que NO usan OTLP (bases de datos y Alloy)
 // ====================================  
 
 // Relabeling para agregar metadata de contenedores  
 discovery.relabel "docker_logs" {  
   targets = discovery.docker.containers.targets  
 
-  // Mantener solo contenedores shopnow-*  
+  // ⬇️ EXCLUIR servicios que usan OTLP (api-gateway, order-service) ⬇️
+  rule {  
+    source_labels = ["__meta_docker_container_name"]  
+    regex         = "/(shopnow-api-gateway|shopnow-order-service)"  
+    action        = "drop"  // ⬅️ Drop estos contenedores - ya envían logs vía OTLP
+  }  
+
+  // Mantener solo contenedores shopnow-* (después de excluir los de arriba)  
   rule {  
     source_labels = ["__meta_docker_container_name"]  
     regex         = "/shopnow-.*"  
@@ -330,7 +337,7 @@ discovery.relabel "docker_logs" {
   }  
 }  
 
-// Leer logs de archivos  
+// Leer logs de archivos (SOLO bases de datos y Alloy ahora)
 loki.source.file "docker_logs" {  
   targets    = discovery.relabel.docker_logs.output  
   forward_to = [loki.process.docker_json.receiver]  
