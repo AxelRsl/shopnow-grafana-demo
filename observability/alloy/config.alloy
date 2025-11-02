@@ -185,14 +185,27 @@ prometheus.scrape "alloy" {
 
 // ====================================    
 // DOCKER CONTAINER DISCOVERY
-// Discovers all Docker containers for metrics
+// Discovers all Docker containers
 // ====================================    
 discovery.docker "containers" {    
   host = "unix:///var/run/docker.sock"    
-}    
+}
+
+// Relabel to only scrape containers with Prometheus metrics
+discovery.relabel "prometheus_metrics" {
+  targets = discovery.docker.containers.targets
+  
+  // Only scrape containers with metrics port exposed
+  // This avoids trying to scrape databases which triggers security warnings
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(shopnow-alloy|shopnow-api-gateway|shopnow-order-service)"
+    action        = "keep"
+  }
+}
 
 prometheus.scrape "containers" {    
-  targets    = discovery.docker.containers.targets    
+  targets    = discovery.relabel.prometheus_metrics.output    
   forward_to = [prometheus.remote_write.grafana_cloud.receiver]    
   
   scrape_interval = "15s"    
