@@ -23,15 +23,38 @@ This project demonstrates a full-stack Black Friday load testing scenario with c
 
 ShopNow is a microservices-based e-commerce platform that simulates Black Friday traffic (50X normal load). This demo showcases:
 
-- **6 Microservices** instrumented with OpenTelemetry
-- **Frontend** with Grafana Faro (Real User Monitoring)
-- **Load Testing** with Grafana K6
-- **Complete Observability** with Grafana Cloud (Mimir, Loki, Tempo)
+- **6 Microservices** instrumented with OpenTelemetry (Go + Python + Node.js)
+- **Modern Frontend** (Next.js 14) with Grafana Faro Real User Monitoring
+- **Product Catalog** with real images from Unsplash API
+- **Load Testing** with Grafana K6 (simulates 250K requests/min)
+- **Complete Observability** with Grafana Cloud (Mimir, Loki, Tempo, Pyroscope)
 - **IRM** (SLOs, Alerting, OnCall, Incident Management)
+- **Containerized** with Docker Compose for easy deployment
 
 ### Demo Story
 
 > "ShopNow processes 50X normal traffic during Black Friday. Last year they collapsed at 80K req/min losing $2M. This year, with Grafana Cloud, they can predict, test, and prevent failures before they impact customers."
+
+### Key Features
+
+✅ **Full-Stack Observability:**
+- Backend: Metrics, Logs, Traces, Profiles (MELT)
+- Frontend: Real User Monitoring (RUM) with Faro
+- Infrastructure: Database monitoring (PostgreSQL, MongoDB, Redis)
+
+✅ **Realistic E-commerce Flow:**
+- Product browsing with images
+- Shopping cart management
+- Order processing with payment simulation
+- Product recommendations
+- Inventory management
+
+✅ **Production-Ready Patterns:**
+- Distributed tracing across services
+- Structured logging with context
+- Error tracking and alerting
+- Performance profiling
+- SLO-based monitoring
 
 ---
 
@@ -77,6 +100,34 @@ ShopNow is a microservices-based e-commerce platform that simulates Black Friday
                     │  Mimir │ Loki │ Tempo  │
                     └────────────────────────┘
 ```
+
+### Tech Stack
+
+**Frontend:**
+- Next.js 14 (React framework with App Router)
+- Tailwind CSS (styling)
+- Grafana Faro Web SDK (RUM)
+- Unsplash API (product images)
+
+**Backend Services:**
+- Go (Payment Service, Order Service)
+- Python + FastAPI (Inventory Service, Recommendation Service)
+- Node.js + Express (API Gateway)
+
+**Databases:**
+- PostgreSQL 15 (transactional data)
+- MongoDB 7 (product catalog, recommendations)
+- Redis 7 (caching, session management)
+
+**Observability:**
+- Grafana Alloy (telemetry pipeline)
+- OpenTelemetry SDK (instrumentation)
+- Grafana Cloud (Mimir, Loki, Tempo, Pyroscope)
+- Grafana Faro (frontend monitoring)
+
+**DevOps:**
+- Docker & Docker Compose
+- Grafana K6 (load testing)
 
 ---
 
@@ -139,13 +190,22 @@ notepad .env
 
 Fill in these required values:
 ```env
+# Grafana Cloud - Backend Observability
 GRAFANA_CLOUD_API_KEY=glc_xxxxxxxxxxxxx
 GRAFANA_CLOUD_PROMETHEUS_URL=https://prometheus-xxx.grafana.net/api/prom/push
 GRAFANA_CLOUD_PROMETHEUS_USER=123456
 GRAFANA_CLOUD_LOKI_URL=https://logs-xxx.grafana.net/loki/api/v1/push
 GRAFANA_CLOUD_LOKI_USER=123456
 GRAFANA_CLOUD_TEMPO_URL=tempo-xxx.grafana.net:443
+
+# Grafana Faro - Frontend Observability (Optional but recommended)
+GRAFANA_CLOUD_FARO_URL=https://faro-collector-xxx.grafana.net/collect/YOUR_API_KEY
+NEXT_PUBLIC_FARO_URL=https://faro-collector-xxx.grafana.net/collect/YOUR_API_KEY
+NEXT_PUBLIC_FARO_APP_NAME=shopnow-frontend
+NEXT_PUBLIC_FARO_ENVIRONMENT=production
 ```
+
+> **Note:** Faro URL includes the API key in the endpoint. Get it from Grafana Cloud → Frontend Observability → Create App.
 
 ### Step 3: Build and Start Services
 
@@ -181,15 +241,27 @@ shopnow-frontend           Up
 ### Step 4: Verify Services
 
 ```powershell
-# Test API Gateway
+# Test API Gateway health
 curl http://localhost:3000/health
 
-# Test Frontend
+# Test API products endpoint
+curl http://localhost:3000/api/products
+
+# Open Frontend (Next.js with Faro RUM)
 start http://localhost:3001
 
-# Check Alloy UI
+# Check Alloy UI (metrics/logs pipeline)
 start http://localhost:12345
+
+# View Grafana Cloud Frontend Observability
+# Go to: Grafana Cloud → Frontend Observability → shopnow-frontend
 ```
+
+**Expected Frontend Features:**
+- ✅ Product catalog with images
+- ✅ Shopping cart functionality
+- ✅ Faro RUM tracking in browser console
+- ✅ Real-time event tracking (page views, clicks, API calls)
 
 ### Step 5: Generate Load (Normal Traffic)
 
@@ -274,12 +346,22 @@ k6 cloud black-friday.js
 
 ### Frontend (Next.js)
 - **Port:** 3001
-- **Purpose:** User interface
-- **Technologies:** Next.js, React, Grafana Faro
+- **Purpose:** User interface with Real User Monitoring
+- **Technologies:** Next.js 14, React, Grafana Faro, Tailwind CSS
 - **Features:**
-  - Real User Monitoring (RUM)
-  - Web Vitals tracking
-  - Error tracking
+  - Real User Monitoring (RUM) with Grafana Faro
+  - Web Vitals tracking (LCP, FID, CLS)
+  - Error tracking and session replay
+  - Product catalog with images from Unsplash
+  - Shopping cart functionality
+  - Responsive design
+- **Access:** http://localhost:3001
+- **Faro Events Tracked:**
+  - Page views
+  - API requests (start, complete, failed)
+  - Products loaded
+  - Add to cart
+  - Checkout events
 
 ---
 
