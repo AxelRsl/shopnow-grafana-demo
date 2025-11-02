@@ -81,10 +81,13 @@ services:
       - mongodb-data:/data/db
       - ./infrastructure/mongodb/init.js:/docker-entrypoint-initdb.d/init.js
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/shopnow --quiet
-      interval: 10s
+      # Usar mongosh con --eval es más eficiente que pipe
+      # Reduce sobrecarga de conexiones comparado con echo | mongosh
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')", "--quiet"]
+      interval: 30s  # ⬅️ Reducido de 10s a 30s (menos conexiones)
       timeout: 5s
-      retries: 5
+      retries: 3     # ⬅️ Reducido de 5 a 3 (más rápido fail)
+      start_period: 10s  # ⬅️ Espera inicial antes de health checks
     # Increase vm.max_map_count for MongoDB
     sysctls:
       - net.core.somaxconn=511
