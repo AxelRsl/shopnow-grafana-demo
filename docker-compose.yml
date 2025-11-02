@@ -146,6 +146,10 @@ services:
       - GRAFANA_CLOUD_PYROSCOPE_URL=${GRAFANA_CLOUD_PYROSCOPE_URL}
       - GRAFANA_CLOUD_PYROSCOPE_USER=${GRAFANA_CLOUD_PYROSCOPE_USER}
       - GRAFANA_CLOUD_PYROSCOPE_PASSWORD=${GRAFANA_CLOUD_PYROSCOPE_PASSWORD}
+      
+      # Faro (RUM)
+      - GRAFANA_CLOUD_FARO_URL=${GRAFANA_CLOUD_FARO_URL}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
     depends_on:  
       postgres:  
         condition: service_healthy  
@@ -221,6 +225,39 @@ services:
     depends_on:
       - postgres
       - redis
+      - alloy
+    networks:
+      - shopnow-network
+    restart: unless-stopped
+
+  # ===============================
+  # FRONTEND
+  # ===============================
+  
+  frontend:
+    build:
+      context: ./services/frontend
+      dockerfile: Dockerfile
+    container_name: shopnow-frontend
+    labels:
+      com.grafana.service: frontend
+      com.grafana.job: frontend
+      com.grafana.project: shopnow
+    ports:
+      - "${FRONTEND_PORT:-3001}:3000"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:3000}
+      - NEXT_PUBLIC_FARO_URL=${NEXT_PUBLIC_FARO_URL}
+      - NEXT_PUBLIC_FARO_APP_NAME=${NEXT_PUBLIC_FARO_APP_NAME:-shopnow-frontend}
+      - NEXT_PUBLIC_FARO_ENVIRONMENT=${NEXT_PUBLIC_FARO_ENVIRONMENT:-development}
+    depends_on:
+      - api-gateway
       - alloy
     networks:
       - shopnow-network
