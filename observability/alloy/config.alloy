@@ -236,15 +236,17 @@ discovery.docker "containers" {
   host = "unix:///var/run/docker.sock"    
 }
 
-// Relabel to only scrape containers with Prometheus metrics
+// ====================================  
+// PROMETHEUS SCRAPING - SOLO ALLOY  
+// No scrape api-gateway ni order-service (no tienen /metrics endpoint)  
+// ====================================  
 discovery.relabel "prometheus_metrics" {
   targets = discovery.docker.containers.targets
   
-  // Only scrape containers with metrics port exposed
-  // This avoids trying to scrape databases which triggers security warnings
+  // ⬇️ SOLO scrape Alloy (el único que expone /metrics) ⬇️
   rule {
     source_labels = ["__meta_docker_container_name"]
-    regex         = "/(shopnow-alloy|shopnow-api-gateway|shopnow-order-service)"
+    regex         = "/shopnow-alloy"  // ⬅️ Solo Alloy, sin api-gateway ni order-service
     action        = "keep"
   }
 }
