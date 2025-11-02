@@ -12,6 +12,11 @@ services:
       com.grafana.service: postgres
       com.grafana.job: database
       com.grafana.project: shopnow
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-shopnow}
       POSTGRES_USER: ${POSTGRES_USER:-shopnow}
@@ -36,6 +41,11 @@ services:
       com.grafana.service: redis
       com.grafana.job: cache
       com.grafana.project: shopnow
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     command: redis-server --requirepass ${REDIS_PASSWORD:-redis123}
     ports:
       - "6379:6379"
@@ -56,6 +66,11 @@ services:
       com.grafana.service: mongodb
       com.grafana.job: database
       com.grafana.project: shopnow
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USER:-shopnow}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD:-mongo123}
@@ -80,6 +95,7 @@ services:
   alloy:  
     image: grafana/alloy:latest  
     container_name: shopnow-alloy  
+    user: "0:0"  # Run as root to access Docker socket on Windows
     labels:  
       com.grafana.service: alloy  
       com.grafana.job: observability  
@@ -91,8 +107,14 @@ services:
       - "4040:4040"    # Pyroscope Profiles
     volumes:  
       - ./observability/alloy/config.alloy:/etc/alloy/config.alloy  
-      - //var/run/docker.sock:/var/run/docker.sock:ro  
+      - /var/run/docker.sock:/var/run/docker.sock:ro  # Single slash for Windows Docker Desktop
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro  # Docker log files
     command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy  
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:  
       # Prometheus/Mimir  
       - GRAFANA_CLOUD_PROMETHEUS_URL=${GRAFANA_CLOUD_PROMETHEUS_URL}  
@@ -138,6 +160,11 @@ services:
       com.grafana.project: shopnow
     ports:
       - "${API_GATEWAY_PORT:-3000}:3000"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       - NODE_ENV=${NODE_ENV:-development}
       - SERVICE_NAME=api-gateway
@@ -167,6 +194,11 @@ services:
       com.grafana.project: shopnow
     ports:
       - "${ORDER_SERVICE_PORT:-8003}:8003"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       - SERVICE_NAME=order-service
       - PORT=8003

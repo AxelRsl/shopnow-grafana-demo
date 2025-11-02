@@ -84,11 +84,11 @@ otelcol.exporter.prometheus "grafana_cloud" {
 // ====================================      
 prometheus.remote_write "grafana_cloud" {      
   endpoint {      
-    url = env("GRAFANA_CLOUD_PROMETHEUS_URL")      
+    url = sys.env("GRAFANA_CLOUD_PROMETHEUS_URL")      
     
     basic_auth {      
-      username = env("GRAFANA_CLOUD_PROMETHEUS_USER")      
-      password = env("GRAFANA_CLOUD_PROMETHEUS_PASSWORD")  // ⬅️ Cambia de GRAFANA_CLOUD_API_KEY  
+      username = sys.env("GRAFANA_CLOUD_PROMETHEUS_USER")      
+      password = sys.env("GRAFANA_CLOUD_PROMETHEUS_PASSWORD")  // ⬅️ Cambia de GRAFANA_CLOUD_API_KEY  
     }      
     
     queue_config {      
@@ -105,18 +105,29 @@ prometheus.remote_write "grafana_cloud" {
 // Sends logs to Grafana Cloud Loki      
 // ====================================      
 otelcol.exporter.loki "grafana_cloud" {      
-  forward_to = [loki.process.parse_logs.receiver]      
-}      
+  forward_to = [loki.relabel.otlp_logs.receiver]      
+}
+
+// Pipeline for OTLP logs (already structured, no parsing needed)
+loki.relabel "otlp_logs" {
+  forward_to = [loki.write.grafana_cloud.receiver]
+  
+  // Copy service_name to service for Drilldown compatibility
+  rule {
+    source_labels = ["service_name"]
+    target_label  = "service"
+  }
+}
 
 loki.write "grafana_cloud" {      
   endpoint {      
-    url = env("GRAFANA_CLOUD_LOKI_URL")      
+    url = sys.env("GRAFANA_CLOUD_LOKI_URL")      
     
     basic_auth {      
-      username = env("GRAFANA_CLOUD_LOKI_USER")      
-      password = env("GRAFANA_CLOUD_LOKI_PASSWORD")  // ⬅️ Cambia de GRAFANA_CLOUD_API_KEY  
-    }      
-  }      
+      username = sys.env("GRAFANA_CLOUD_LOKI_USER")      
+      password = sys.env("GRAFANA_CLOUD_LOKI_PASSWORD")
+    }
+  }
 }  
 
 // ====================================      
@@ -125,14 +136,14 @@ loki.write "grafana_cloud" {
 // ====================================      
 otelcol.exporter.otlp "grafana_cloud" {      
   client {      
-    endpoint = env("GRAFANA_CLOUD_TEMPO_ENDPOINT")  
+    endpoint = sys.env("GRAFANA_CLOUD_TEMPO_ENDPOINT")  
     auth     = otelcol.auth.basic.grafana_cloud_tempo.handler      
   }      
 }      
 
 otelcol.auth.basic "grafana_cloud_tempo" {  
-  username = env("GRAFANA_CLOUD_TEMPO_USER")  
-  password = env("GRAFANA_CLOUD_TEMPO_PASSWORD")  
+  username = sys.env("GRAFANA_CLOUD_TEMPO_USER")  
+  password = sys.env("GRAFANA_CLOUD_TEMPO_PASSWORD")  
 }   
 
 // ====================================
@@ -150,11 +161,11 @@ pyroscope.receive_http "default" {
 
 pyroscope.write "grafana_cloud" {
   endpoint {
-    url = env("GRAFANA_CLOUD_PYROSCOPE_URL")
+    url = sys.env("GRAFANA_CLOUD_PYROSCOPE_URL")
     
     basic_auth {
-      username = env("GRAFANA_CLOUD_PYROSCOPE_USER")
-      password = env("GRAFANA_CLOUD_PYROSCOPE_PASSWORD")
+      username = sys.env("GRAFANA_CLOUD_PYROSCOPE_USER")
+      password = sys.env("GRAFANA_CLOUD_PYROSCOPE_PASSWORD")
     }
   }
 }
@@ -173,16 +184,11 @@ prometheus.scrape "alloy" {
 }    
 
 // ====================================    
-// DOCKER CONTAINER DISCOVERY    
-// Automatically discovers and monitors Docker containers    
+// DOCKER CONTAINER DISCOVERY
+// Discovers all Docker containers for metrics
 // ====================================    
 discovery.docker "containers" {    
   host = "unix:///var/run/docker.sock"    
-  
-  filter {    
-    name   = "name"    
-    values = ["shopnow-*"]    
-  }    
 }    
 
 prometheus.scrape "containers" {    
@@ -193,73 +199,107 @@ prometheus.scrape "containers" {
   scrape_timeout  = "10s"    
 }    
 
-// ====================================    
-// DOCKER LOGS COLLECTION    
-// Collects logs from Docker containers    
-// ====================================    
-loki.source.docker "containers" {    
-  host    = "unix:///var/run/docker.sock"    
-  targets = discovery.docker.containers.targets    
-  forward_to = [loki.relabel.docker.receiver]    
+// ====================================  
+// DOCKER LOGS - MÉTODO ROBUSTO VIA ARCHIVOS  
+// Usa loki.source.file en lugar de loki.source.docker  
+// ====================================  
 
-}    
+// Relabeling para agregar metadata de contenedores  
+discovery.relabel "docker_logs" {  
+  targets = discovery.docker.containers.targets  
 
-loki.relabel "docker" {    
-  forward_to = [loki.process.parse_logs.receiver]    
-  
-  // Extraer nombre del contenedor (remover la barra inicial)    
-  rule {    
-    source_labels = ["__meta_docker_container_name"]    
-    regex         = "/?(.*)"    
-    target_label  = "container"    
-    replacement   = "$1"    
-  }    
-  
-  // Usar label personalizada com.grafana.service    
-  rule {    
-    source_labels = ["__meta_docker_container_label_com_grafana_service"]    
-    regex         = "(.+)"    
-    target_label  = "service_name"    
-    replacement   = "$1"    
-  }    
-  
-  // Fallback: extraer service del nombre del contenedor (shopnow-xxxx)    
-  rule {    
-    source_labels = ["__meta_docker_container_name"]    
-    regex         = "/shopnow-(.*)"    
-    target_label  = "service_name"    
-    replacement   = "$1"    
-  }    
-  
-  // Label job    
-  rule {    
-    source_labels = ["__meta_docker_container_label_com_grafana_job"]    
-    regex         = "(.+)"    
-    target_label  = "job"    
-    replacement   = "$1"    
-  }    
-  
-  // Label project    
-  rule {    
-    source_labels = ["__meta_docker_container_label_com_grafana_project"]    
-    regex         = "(.+)"    
-    target_label  = "project"    
-    replacement   = "$1"    
-  }    
-  
-  // Container ID    
-  rule {    
-    source_labels = ["__meta_docker_container_id"]    
-    target_label  = "container_id"    
-  }    
-  
-  // ⭐⭐⭐ CRÍTICO: Mantener todos los logs que tengan service_name ⭐⭐⭐  
+  // Mantener solo contenedores shopnow-*  
   rule {  
+    source_labels = ["__meta_docker_container_name"]  
+    regex         = "/shopnow-.*"  
     action        = "keep"  
-    source_labels = ["service_name"]  
-    regex         = ".+"  
   }  
-}    
+
+  // Construir path al archivo de log  
+  rule {  
+    source_labels = ["__meta_docker_container_id"]  
+    target_label  = "__path__"  
+    replacement   = "/var/lib/docker/containers/${1}/${1}-json.log"  
+  }  
+
+  // Extraer nombre del contenedor  
+  rule {  
+    source_labels = ["__meta_docker_container_name"]  
+    regex         = "/?(.*)"  
+    target_label  = "container"  
+  }  
+
+  // service_name desde label  
+  rule {  
+    source_labels = ["__meta_docker_container_label_com_grafana_service"]  
+    regex         = "(.+)"  
+    target_label  = "service_name"  
+  }  
+
+  // Fallback service_name desde nombre  
+  rule {  
+    source_labels = ["__meta_docker_container_name"]  
+    regex         = "/shopnow-(.*)"  
+    target_label  = "service_name"  
+  }  
+
+  // job label  
+  rule {  
+    source_labels = ["__meta_docker_container_label_com_grafana_job"]  
+    regex         = "(.+)"  
+    target_label  = "job"  
+  }  
+
+  // project label  
+  rule {  
+    source_labels = ["__meta_docker_container_label_com_grafana_project"]  
+    regex         = "(.+)"  
+    target_label  = "project"  
+  }  
+
+  // container_id  
+  rule {  
+    source_labels = ["__meta_docker_container_id"]  
+    target_label  = "container_id"  
+  }  
+
+  // service para Drilldown  
+  rule {  
+    source_labels = ["service_name"]  
+    target_label  = "service"  
+  }  
+}  
+
+// Leer logs de archivos  
+loki.source.file "docker_logs" {  
+  targets    = discovery.relabel.docker_logs.output  
+  forward_to = [loki.process.docker_json.receiver]  
+}  
+
+// Procesar formato JSON de Docker  
+loki.process "docker_json" {  
+  forward_to = [loki.process.parse_logs.receiver]  
+
+  // Docker logs vienen en formato JSON  
+  stage.json {  
+    expressions = {  
+      output = "log",  
+      stream = "stream",  
+      time   = "time",  
+    }  
+  }  
+
+  // Usar el contenido del log  
+  stage.output {  
+    source = "output"  
+  }  
+
+  // Timestamp del log  
+  stage.timestamp {  
+    source = "time"  
+    format = "RFC3339Nano"  
+  }  
+}
 
 // ====================================    
 // LOG PROCESSING PIPELINE    
