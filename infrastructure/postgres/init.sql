@@ -117,7 +117,16 @@ CREATE INDEX idx_inventory_transactions_created_at ON inventory_transactions(cre
 -- SEED DATA
 -- ====================================
 
--- Insert test users
+-- Insert test users for load testing (100 users)
+-- Generate users for K6 load tests
+INSERT INTO users (email, name, password_hash) 
+SELECT 
+    'user' || generate_series || '@shopnow.test',
+    'Test User ' || generate_series,
+    'test_password_hash_' || generate_series
+FROM generate_series(1, 100);
+
+-- Insert some specific named users
 INSERT INTO users (email, name, password_hash) VALUES
     ('john.doe@example.com', 'John Doe', 'hashed_password_1'),
     ('jane.smith@example.com', 'Jane Smith', 'hashed_password_2'),
